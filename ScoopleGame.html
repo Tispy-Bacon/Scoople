@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scoople</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ffdec9;
+            color: #8f4d70;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .title {
+            font-size: 3rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.2rem;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-rows: repeat(6, 1fr);
+            gap: 0.5rem;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0.5rem;
+        }
+
+        .letter-box {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            border: 2px solid #8f4d70;
+            text-transform: uppercase;
+            border-radius: 8px;
+            transition: transform 0.2s ease-in-out, background-color 0.6s ease-in-out;
+            cursor: default;
+        }
+        
+        @media (min-width: 640px) {
+             .letter-box {
+                width: 60px;
+                height: 60px;
+             }
+        }
+
+        .letter-box.flip {
+            transform: rotateX(180deg);
+        }
+
+        .letter-box.correct {
+            background-color: #8f4d70;
+            color: #ffdec9;
+            border-color: #8f4d70;
+        }
+
+        .letter-box.present {
+            background-color: #ffdec9;
+            color: #8f4d70;
+            border-color: #8f4d70;
+        }
+
+        .letter-box.absent {
+            background-color: #ffdec9;
+            color: #8f4d70;
+            border-color: #8f4d70;
+            opacity: 0.5;
+        }
+
+        .keyboard-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            width: 100%;
+        }
+
+        .keyboard-row {
+            display: flex;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+
+        .key {
+            padding: 0.5rem 0.6rem;
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background-color: #8f4d70;
+            color: #ffdec9;
+            transition: background-color 0.2s ease, opacity 0.2s ease;
+        }
+
+        .key:hover {
+            opacity: 0.9;
+        }
+        
+        .key.enter, .key.backspace {
+            width: auto;
+            min-width: 4rem;
+        }
+
+        .key.correct {
+            background-color: #8f4d70;
+            color: #ffdec9;
+        }
+        .key.present {
+             background-color: #ffdec9;
+            color: #8f4d70;
+        }
+        .key.absent {
+            background-color: #ffdec9;
+            color: #8f4d70;
+            opacity: 0.5;
+        }
+
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 1.5rem 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            z-index: 1000;
+            font-size: 1.25rem;
+            font-weight: bold;
+            display: none;
+        }
+
+        .restart-button {
+            margin-top: 1rem;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: #8f4d70;
+            color: #ffdec9;
+        }
+    </style>
+</head>
+<body class="bg-[#ffdec9]">
+    <div class="container">
+        <h1 class="title">Scoople</h1>
+        <div id="game-grid" class="grid-container"></div>
+        <div id="keyboard" class="keyboard-container"></div>
+    </div>
+
+    <div id="message-box" class="message-box">
+        <p id="message-text"></p>
+        <button id="restart-button" class="restart-button">Play Again</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const wordLength = 6;
+            const maxGuesses = 6;
+            const gameGrid = document.getElementById('game-grid');
+            const keyboardContainer = document.getElementById('keyboard');
+            const messageBox = document.getElementById('message-box');
+            const messageText = document.getElementById('message-text');
+            const restartButton = document.getElementById('restart-button');
+
+            let currentGuess = '';
+            let currentRow = 0;
+            let secretWord = '';
+            let wordList = [];
+            let isGameOver = false;
+
+            // Simulate fetching the word list from an external file
+            async function fetchWords() {
+                try {
+                    const response = await fetch('6-letter-words.json');
+                    wordList = await response.json();
+                    initializeGame();
+                } catch (error) {
+                    console.error('Error fetching word list:', error);
+                    showMessage('Could not load word list. Please try again later.');
+                }
+            }
+
+            function initializeGame() {
+                // Clear any previous game state
+                gameGrid.innerHTML = '';
+                keyboardContainer.innerHTML = '';
+                currentGuess = '';
+                currentRow = 0;
+                isGameOver = false;
+                
+                // Select a random word from the list
+                secretWord = wordList[Math.floor(Math.random() * wordList.length)].toUpperCase();
+                console.log('Secret word is:', secretWord); // For debugging purposes
+
+                createGrid();
+                createKeyboard();
+                setupEventListeners();
+                hideMessage();
+            }
+
+            function createGrid() {
+                for (let i = 0; i < maxGuesses; i++) {
+                    const row = document.createElement('div');
+                    row.className = 'row';
+                    for (let j = 0; j < wordLength; j++) {
+                        const box = document.createElement('div');
+                        box.className = 'letter-box';
+                        row.appendChild(box);
+                    }
+                    gameGrid.appendChild(row);
+                }
+            }
+
+            function createKeyboard() {
+                const keys = [
+                    ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+                    ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+                    ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'BACKSPACE']
+                ];
+
+                keys.forEach(rowKeys => {
+                    const row = document.createElement('div');
+                    row.className = 'keyboard-row';
+                    rowKeys.forEach(keyText => {
+                        const key = document.createElement('button');
+                        key.className = 'key';
+                        if (keyText.length > 1) {
+                            key.classList.add(keyText.toLowerCase());
+                        }
+                        key.textContent = keyText;
+                        key.addEventListener('click', () => handleInput(keyText));
+                        row.appendChild(key);
+                    });
+                    keyboardContainer.appendChild(row);
+                });
+            }
+
+            function setupEventListeners() {
+                document.removeEventListener('keydown', handleKeyDown);
+                document.addEventListener('keydown', handleKeyDown);
+                restartButton.addEventListener('click', initializeGame);
+            }
+
+            function handleKeyDown(event) {
+                if (isGameOver) return;
+
+                const key = event.key.toUpperCase();
+                if (key.match(/^[A-Z]$/)) {
+                    handleInput(key);
+                } else if (key === 'BACKSPACE' || key === 'DELETE') {
+                    handleInput('BACKSPACE');
+                } else if (key === 'ENTER') {
+                    handleInput('ENTER');
+                }
+            }
+
+            function handleInput(key) {
+                if (isGameOver) return;
+
+                if (key === 'BACKSPACE') {
+                    currentGuess = currentGuess.slice(0, -1);
+                } else if (key === 'ENTER') {
+                    if (currentGuess.length === wordLength) {
+                        checkGuess();
+                    }
+                } else if (key.length === 1 && currentGuess.length < wordLength) {
+                    currentGuess += key;
+                }
+
+                updateGrid();
+            }
+
+            function updateGrid() {
+                const row = gameGrid.children[currentRow];
+                for (let i = 0; i < wordLength; i++) {
+                    const box = row.children[i];
+                    box.textContent = currentGuess[i] || '';
+                }
+            }
+
+            function checkGuess() {
+                if (!wordList.includes(currentGuess.toLowerCase())) {
+                    showMessage('Not a valid word.');
+                    return;
+                }
+                
+                const guessArr = currentGuess.split('');
+                const secretArr = secretWord.split('');
+                const row = gameGrid.children[currentRow];
+
+                let correctPositions = new Array(wordLength).fill(false);
+                let letterCounts = {};
+                for (const char of secretArr) {
+                    letterCounts[char] = (letterCounts[char] || 0) + 1;
+                }
+                
+                // First pass: Mark correct letters
+                for (let i = 0; i < wordLength; i++) {
+                    if (guessArr[i] === secretArr[i]) {
+                        row.children[i].classList.add('correct');
+                        letterCounts[guessArr[i]]--;
+                        correctPositions[i] = true;
+                    }
+                }
+                
+                // Second pass: Mark present and absent letters
+                for (let i = 0; i < wordLength; i++) {
+                    const box = row.children[i];
+                    if (correctPositions[i]) {
+                        continue;
+                    }
+
+                    if (secretArr.includes(guessArr[i]) && letterCounts[guessArr[i]] > 0) {
+                        box.classList.add('present');
+                        letterCounts[guessArr[i]]--;
+                    } else {
+                        box.classList.add('absent');
+                    }
+                }
+
+                // Update keyboard colors
+                for (let i = 0; i < wordLength; i++) {
+                    const letter = currentGuess[i];
+                    const keyboardKey = document.querySelector(`.key[data-key="${letter}"]`) ||
+                                        document.querySelector(`.key:not(.enter):not(.backspace):not(.restart-button)[textContent="${letter}"]`);
+                    
+                    if (keyboardKey) {
+                        if (row.children[i].classList.contains('correct')) {
+                            keyboardKey.classList.remove('present', 'absent');
+                            keyboardKey.classList.add('correct');
+                        } else if (row.children[i].classList.contains('present') && !keyboardKey.classList.contains('correct')) {
+                            keyboardKey.classList.remove('absent');
+                            keyboardKey.classList.add('present');
+                        } else if (row.children[i].classList.contains('absent') && !keyboardKey.classList.contains('correct') && !keyboardKey.classList.contains('present')) {
+                            keyboardKey.classList.add('absent');
+                        }
+                    }
+                }
+
+                // Check for win/loss conditions
+                if (currentGuess === secretWord) {
+                    showMessage('You won!');
+                    isGameOver = true;
+                } else if (currentRow === maxGuesses - 1) {
+                    showMessage(`You lost! The word was ${secretWord}.`);
+                    isGameOver = true;
+                } else {
+                    currentGuess = '';
+                    currentRow++;
+                }
+            }
+
+            function showMessage(text) {
+                messageText.textContent = text;
+                messageBox.style.display = 'block';
+            }
+            
+            function hideMessage() {
+                messageBox.style.display = 'none';
+            }
+            
+            fetchWords();
+        });
+    </script>
+</body>
+</html>
